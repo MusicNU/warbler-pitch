@@ -9,6 +9,8 @@ Plan on using librosa library
 3. Activate the virtual environment:
 - On Windows:
   `venv\Scripts\activate`
+  - When lack privileges:
+  `Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser`
 - On macOS/Linux:
   `source venv/bin/activate`
 4. Install dependencies:
