@@ -4,6 +4,7 @@ from music21 import converter, tempo
 from compare_pitch import accuracy_check
 
 default_tempo: int = 120 # default tempo for a score if no tempo is specified
+rest_pitch: float = float('nan') # pitch used to represent rest. A rest doesn't have a pitch, so it is set to impossible value -1.0
 
 def load_audio(audio_path: str) -> tuple[np.ndarray, int]:
     """Load audio file and it's sample rate"""
@@ -25,7 +26,6 @@ def get_tempos(score: music21.stream.Score) -> list[tuple[float, int]]:
     return tempos
 
 def find_expected_pitches(score: music21.stream.Score, tempos_list: list[tuple[float, str]], sample_rate: int, hop_length: int) -> list[int]:
-
     # TO DO NOW:
     # I think the coded I added works but it doesn't consider hop_length.
     # the resulting array to compare could be big asf so now I need to implement only extending by some hop_length
@@ -49,28 +49,29 @@ def find_expected_pitches(score: music21.stream.Score, tempos_list: list[tuple[f
         next_note_change: float = cur_beat + note_length
         next_tempo_change: float = tempos_list[tempo_ptr + 1][0] if tempo_ptr < len(tempos_list) - 1 else float('inf')
 
-        cur_end: float = next_note_change
         cur_tempo: int = tempos_list[tempo_ptr][1]
-        cur_pitch: float = note.pitch.frequency if note.isNote else -1 # NOTE: IF IT'S A REST FREQUENCY IS SET TO -1
+        cur_pitch: float = note.pitch.frequency if note.isNote else rest_pitch # NOTE: IF IT'S A REST FREQUENCY IS SET TO -1
+
+        extend_pitches(start=cur_beat, end=next_note_change, pitch=cur_pitch, tempo=cur_tempo)
+        cur_beat = next_note_change # I belive the only case to watch is when note changes, as tempo only changes on note changes as well (at least in MuseScore)
 
         # increment next tempo if the tempo change occurs at next note
         if next_tempo_change == next_note_change:
             tempo_ptr += 1
         # always increment to next note
         note_ptr += 1
-
-        extend_pitches(start=cur_beat, end=cur_end, pitch=cur_pitch, tempo=cur_tempo)
-        cur_beat = next_note_change # I belive the only case to watch is when note changes, as tempo only changes on note changes as well (at least in MuseScore)
         
 
 def debuggingtestingstuff():
     audio_path = ".\\test_files\\test2.wav"
     sheet_music_path = ".\\test_files\\test2.mxl"
 
+    test_piano_path = ".\\test_files\\775495__tian_yueyao__piano-76.wav"
+
     score = converter.parse(sheet_music_path)
     print(f"score is ", score)
 
-    y, sample_rate = load_audio(audio_path)
+    y, sample_rate = load_audio(test_piano_path)
 
     f0: np.ndarray
     voiced_flag: np.ndarray 
@@ -79,15 +80,14 @@ def debuggingtestingstuff():
     f0, voiced_flag, voiced_probs = librosa.pyin(y, fmin=librosa.note_to_hz('C2'), fmax=librosa.note_to_hz('C7'))
     
     for i in range(0, len(f0), 4):
-        if voiced_flag[i]:
-            print(f"This is the f0 here: {f0[i]}")
-            print(f"This is the voiced_flag here: {voiced_flag[i]}")
-            print(f"This is the voiced_probs here: {voiced_probs[i]}")
+        # if voiced_flag[i]:
+        print(f"This is the f0 here: {f0[i]}")
+        print(f"This is the voiced_flag here: {voiced_flag[i]}")
+        print(f"This is the voiced_probs here: {voiced_probs[i]}")
 
 def testing1():
     audio_path = ".\\test_files\\test2.wav"
-    # sheet_music_path = ".\\test_files\\test2.mxl"
-    sheet_music_path = ".\\test_files\\test1.mxl"
+    sheet_music_path = ".\\test_files\\test2.mxl"
 
     score = converter.parse(sheet_music_path)
     for note in score.flatten().notesAndRests:
@@ -99,13 +99,15 @@ def testing1():
 
 
 def main():
+
+    debuggingtestingstuff()
     # just example
-    user: list[float] = [1,2,3] 
-    expected: list[float] = [1,2,3] 
+    # user: list[float] = [1,2,3] 
+    # expected: list[float] = [1,2,3] 
 
-    print(f"Number of occurences of pitch differing is {accuracy_check(user, expected)}")   
+    # print(f"Number of occurences of pitch differing is {accuracy_check(user, expected)}")   
 
-    testing1()
+    # testing1()
 
             
 if __name__ == "__main__":
