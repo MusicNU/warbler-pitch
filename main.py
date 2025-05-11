@@ -35,11 +35,6 @@ def get_tempos(score: music21.stream.Score) -> list[tuple[float, int]]:
     return tempos
 
 def find_expected_pitches(score: music21.stream.Score, tempos_list: list[tuple[float, str]], sample_rate: int, hop_length: int) -> list[float]:
-    # TO DO NOW:
-    # I think the coded I added works but it doesn't consider hop_length.
-    # the resulting array to compare probably won't be larger than 10^8, so probably fine performance wise. 
-    # However if it's slow we implement only extending by some hop_length
-
     def extend_pitches(start: float, end: float, pitch: float, tempo: float):
         duration: float = end - start
         samples: int = int((duration / tempo * 60) * sample_rate / hop_length)
@@ -123,12 +118,12 @@ def integration():
     score = converter.parse(sheet_music_path)     
     expected_pitches: list[float] = find_expected_pitches(score=score, tempos_list=get_tempos(score), sample_rate=y_sample_rate[1], hop_length=HOP_LENGTH)
     f0: np.ndarray = librosa.pyin(y_sample_rate[0], fmin=librosa.note_to_hz('C2'), fmax=librosa.note_to_hz('C7'), sr=y_sample_rate[1], hop_length=HOP_LENGTH)
-    right_note_hop_window: int = int(1 / (RIGHT_NOTE_WINDOW * ))
+    right_note_hop_window = find_hop_window(y_sample_rate[1])
 
     # print(f"the size of f0[0] or the frequencies estimated is {len(f0[0])}")
     # print(f"the size of expected_pitches is {len(expected_pitches)}")
     
-    print(accuracy_check(f0[0], expected_pitches))
+    print(accuracy_check(f0[0], expected_pitches, right_note_hop_window))
 
 def debug1():
     sheet_music_path = ".\\test_files\\test2.mxl" 
