@@ -1,11 +1,19 @@
-import librosa, music21
-import numpy as np
+import librosa, music21, math, numpy as np
 from music21 import converter, tempo
 from compare_pitch import accuracy_check
-import compare_pitch
+from typing import Final
 
-default_tempo: int = 120 # default tempo for a score if no tempo is specified
-rest_pitch: float = float('nan') # pitch used to represent rest. A rest doesn't have a pitch, so it is set to impossible value nan
+DEFAULT_TEMPO: Final[int] = 120
+"""default tempo for a score if no tempo is specified"""
+
+REST_PITCH: Final[float] = float('nan')
+"""pitch used to represent rest. A rest doesn't have a pitch, so it is set to impossible value nan"""
+
+HOP_LENGTH: Final[int] = 512 
+"""hop length of samples corresponding to both the produced expected pitches and generated estimated fundamental frequencies""" 
+
+RIGHT_NOTE_WINDOW: Final[float] = .07 
+"""window for the user to play the right note in seconds"""
 
 def load_audio(audio_path: str) -> tuple[np.ndarray, int]:
     """Load audio file and it's sample rate"""
@@ -23,7 +31,7 @@ def get_tempos(score: music21.stream.Score) -> list[tuple[float, int]]:
         
     # if the tempo is not provided for the score, or the tempo is not provided until mid-way through the music
     if not tempos or tempos[0][0] > 0.0:
-        tempos.insert(0, (0.0, default_tempo))
+        tempos.insert(0, (0.0, DEFAULT_TEMPO))
     return tempos
 
 def find_expected_pitches(score: music21.stream.Score, tempos_list: list[tuple[float, str]], sample_rate: int, hop_length: int) -> list[float]:
@@ -34,7 +42,7 @@ def find_expected_pitches(score: music21.stream.Score, tempos_list: list[tuple[f
 
     def extend_pitches(start: float, end: float, pitch: float, tempo: float):
         duration: float = end - start
-        samples: int = int((duration / tempo * 60) * sample_rate)
+        samples: int = int((duration / tempo * 60) * sample_rate / hop_length)
         expected_pitches.extend([pitch] * samples)
 
     expected_pitches: list[float] = []
@@ -52,7 +60,7 @@ def find_expected_pitches(score: music21.stream.Score, tempos_list: list[tuple[f
         next_tempo_change: float = tempos_list[tempo_ptr + 1][0] if tempo_ptr < len(tempos_list) - 1 else float('inf')
 
         cur_tempo: int = tempos_list[tempo_ptr][1]
-        cur_pitch: float = note.pitch.frequency if note.isNote else rest_pitch # NOTE: IF IT'S A REST FREQUENCY IS SET TO nan
+        cur_pitch: float = note.pitch.frequency if note.isNote else REST_PITCH # NOTE: IF IT'S A REST FREQUENCY IS SET TO nan
 
         extend_pitches(start=cur_beat, end=next_note_change, pitch=cur_pitch, tempo=cur_tempo)
         cur_beat = next_note_change # I belive the only case to watch is when note changes, as tempo only changes on note changes as well (at least in MuseScore)
@@ -64,7 +72,11 @@ def find_expected_pitches(score: music21.stream.Score, tempos_list: list[tuple[f
         note_ptr += 1
     
     return expected_pitches
-        
+
+def find_hop_window(sample_rate: int):
+    """given any some sample rate, returns the number of hops that the user must play within to be considered "correct\""""
+    seconds_per_hop = HOP_LENGTH / sample_rate
+    return math.ceil(RIGHT_NOTE_WINDOW / seconds_per_hop)
 
 def use_pyin():
     audio_path = ".\\test_files\\test2.wav"
@@ -89,7 +101,7 @@ def use_pyin():
         print(f"This is the voiced_flag here: {voiced_flag[i]}")
         print(f"This is the voiced_probs here: {voiced_probs[i]}")
 
-def testing1():
+def printNotesInScore():
     audio_path = ".\\test_files\\test2.wav"
     sheet_music_path = ".\\test_files\\test2.mxl"
 
@@ -99,7 +111,7 @@ def testing1():
             freq = note.pitch.frequency
             print(f"Note: {note.nameWithOctave}, Frequency: {freq} Hz")
         else:
-            print(f"Rest, Frequency: {rest_pitch} Hz")
+            print(f"Rest, Frequency: {REST_PITCH} Hz")
         # print(note)
     
 # integrate generating the exepcted pitches and comparing the audio to the expected pitches
@@ -109,14 +121,14 @@ def integration():
 
     sheet_music_path = ".\\test_files\\test2.mxl"   # sheet music mxl
     score = converter.parse(sheet_music_path)     
-    expected_pitches: list[float] = find_expected_pitches(score=score, tempos_list=get_tempos(score), sample_rate=y_sample_rate[1], hop_length=4)
-    # for i in range(0, len(expected_pitches), 20):
-    #     print(expected_pitches[i])
-    # print(f"sample rate is {y_sample_rate[1]}")
-    # print(f"size of expected_pitches is {len(expected_pitches)}")
-    f0: np.ndarray = librosa.pyin(y_sample_rate[0], fmin=librosa.note_to_hz('C2'), fmax=librosa.note_to_hz('C7'))
+    expected_pitches: list[float] = find_expected_pitches(score=score, tempos_list=get_tempos(score), sample_rate=y_sample_rate[1], hop_length=HOP_LENGTH)
+    f0: np.ndarray = librosa.pyin(y_sample_rate[0], fmin=librosa.note_to_hz('C2'), fmax=librosa.note_to_hz('C7'), sr=y_sample_rate[1], hop_length=HOP_LENGTH)
+    right_note_hop_window: int = int(1 / (RIGHT_NOTE_WINDOW * ))
+
+    # print(f"the size of f0[0] or the frequencies estimated is {len(f0[0])}")
+    # print(f"the size of expected_pitches is {len(expected_pitches)}")
     
-    print(accuracy_check(f0, expected_pitches))
+    print(accuracy_check(f0[0], expected_pitches))
 
 def debug1():
     sheet_music_path = ".\\test_files\\test2.mxl" 
